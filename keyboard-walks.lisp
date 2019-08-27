@@ -18,7 +18,7 @@
   "if there is a char to the dir under cnt, get it"
   (if char-list-supplied-p
     (push current (cdr (last char-list))))
-  (if (and (getf (gethash current chars-hash) dir) (> cnt 0))
+  (if (and (getf (gethash current chars-hash) dir) (> cnt 1))
     (setf char-list (get-next-char chars-hash (- cnt 1) (getf (gethash current chars-hash) dir) dir char-list)))
   char-list)
 
@@ -29,7 +29,7 @@
       (setf (gethash '1 x) '(:e 2 :se "q"))
       (setf (gethash '2 x) '(:e 3 :se "w" :sw "q" :w 1))
       (setf (gethash '3 x) '(:se "e" :sw "w" :w 2))
-      (setf (gethash "q" x) '(:ne 2 :e "w" :se "a"))
+      (setf (gethash "q" x) '(:ne 2 :e "w" :se "a" :nw 1))
       (setf (gethash "w" x) '(:ne 3 :e "e" :se "s" :sw "a" :w "q" :nw 2))
       (setf (gethash "e" x) '(:se "d" :sw "s" :w "w" :nw 3))
       (setf (gethash "a" x) '(:ne "w" :e "s" :nw "q"))
