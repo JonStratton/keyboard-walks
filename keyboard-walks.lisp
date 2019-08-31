@@ -34,8 +34,8 @@
 (defun make-keyboard(keyboard-matrix dir-delta)
   "Convert a keyboard matrix and an direction to offset plist to a hash of directions to characters."
   (let ((row 0) (col 0) (next-key NIL) (keyboard (make-hash-table :test 'equal)))
-    (dolist (keyrow keyboard-matrix) ; foreach row of keys
-      (dolist (key keyrow) ; foreach key
+    (dolist (keyrow keyboard-matrix)
+      (dolist (key keyrow)
         (dolist (dir '(:n :ne :e :se :sw :w :nw)) ; foreach direction
           (if (and (getf dir-delta dir) ; if we have an offset for that direction
 		   key) ; sticking NIL check here for now
@@ -58,7 +58,7 @@
 		     (NIL "Q" "W" "E" "R" "T" "Y" "U" "I" "O" "P" "{" "}" "|")
 		     (NIL "A" "S" "D" "F" "G" "H" "J" "K" "L" ":")
 		     (NIL "Z" "X" "C" "V" "B" "N" "M" "<" ">" "?")))
-	(main-dir-delta '(:ne (1 -1) :e (1 0) :se (0 1) :sw (-1 1) :w (-1 0) :nw (0 -1)))
+	(main-dir-delta '(:ne (-1 1) :e (0 1) :se (1 0) :sw (1 -1) :w (0 -1) :nw (-1 0)))
 	(num-matrix '((NIL "/(1)" "*(1)" "-(1)")
 		      ("7(1)" "8(1)" "9(1)" "+(1)" ) ; TODO: big plus key...
 		      ("4(1)" "5(1)" "6(1)" "+(2)" )
@@ -68,8 +68,7 @@
         (keyboards (make-hash-table :test 'equal)))
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
-     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
-     keyboards)
-)
+     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
+     keyboards))
 
 (start-walk-keyboard (make-keyboards) base-count)
