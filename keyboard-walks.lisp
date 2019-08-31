@@ -21,21 +21,28 @@
     (setf char-list (get-char-line keyboards (- cnt 1) (getf (gethash current keyboards) dir) dir char-list)))
   char-list)
 
-(defun make-keyboard(keyboard-matrix dir-cart-delta)
+(defun get-next-key(keyboard-matrix row col delta)
+  "Get the next key in the matrix with the current row and col and the delta list(row col)"
+  (let ((row-next-key (+ row (nth 0 delta)))
+        (col-next-key (+ col (nth 1 delta))))
+    (if (and (>= row-next-key 0)
+             (>= col-next-key 0)
+             (nth row-next-key keyboard-matrix)
+             (nth col-next-key (nth row-next-key keyboard-matrix)))
+      (nth col-next-key (nth row-next-key keyboard-matrix)))))
+
+(defun make-keyboard(keyboard-matrix dir-delta)
   "Convert a keyboard matrix and an direction to offset plist to a hash of directions to characters."
-  (let ((row 0) (col 0) (keyboard (make-hash-table :test 'equal)))
+  (let ((row 0) (col 0) (next-key NIL) (keyboard (make-hash-table :test 'equal)))
     (dolist (keyrow keyboard-matrix) ; foreach row of keys
       (dolist (key keyrow) ; foreach key
         (dolist (dir '(:n :ne :e :se :sw :w :nw)) ; foreach direction
-          (if (and (getf dir-cart-delta dir) ; if we have an offset for that direction
+          (if (and (getf dir-delta dir) ; if we have an offset for that direction
 		   key) ; sticking NIL check here for now
-            (let ((row-next-key (+ row (nth 0 (getf dir-cart-delta dir))))
-                  (col-next-key (+ col (nth 1 (getf dir-cart-delta dir)))))
-              (if (and (>= row-next-key 0) ; and a key in that offset
-                       (>= col-next-key 0)
-                       (nth row-next-key keyboard-matrix)
-                       (nth col-next-key (nth row-next-key keyboard-matrix)))
-                (setf (getf (gethash key keyboard) dir) (nth col-next-key (nth row-next-key keyboard-matrix)))))))
+            (progn
+              (setf next-key (get-next-key keyboard-matrix row col (getf dir-delta dir)))
+              (if next-key
+                (setf (getf (gethash key keyboard) dir) next-key)))))
 	 (setq col (+ col 1)))
       (setf col 0)
       (setf row (+ row 1)))
