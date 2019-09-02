@@ -2,21 +2,32 @@
 
 (defparameter base-count 8)
 
+(defun get-directions()
+  '(:n :ne :e :se :s :sw :w :nw))
+
 (defun start-walk-keyboard(keyboards cnt)
   "Foreach key(letter) in keyboards."
   (maphash #'(lambda (k v) (starting-point keyboards cnt k)) keyboards))
 
-(defun get-directions()
-  '(:n :ne :e :se :s :sw :w :nw))
+(defun factor(n &optional (start 1) (factors (list n)))
+  (if (= 0 (mod n start))
+    (push start (cdr (last factors))))
+  (if (< start (/ n 2))
+    (setf factors (factor n (+ start 1) factors)))
+  factors)
+
+(defun get-char-by-dir(keyboards central-char dir)
+  "Takes a keyboard and a direction, and returns that char or nil"
+  (let ((dir-pair (get-char-line keyboards 2 central-char dir)))
+    (if (>= (list-length dir-pair) 2)
+      (nth 1 dir-pair))))
 
 (defun get-chars-around(keyboards central-char)
   "Get the characters around another character on the keyboard"
   (let ((char-list (list))
 	(dir-pairs))
     (dolist (dir (get-directions))
-      (setf dir-pairs (get-char-line keyboards 2 central-char dir))
-      (if (>= (list-length dir-pairs) 2)
-	(pushnew (nth 1 dir-pairs) char-list)))
+      (pushnew (get-char-by-dir keyboards central-char dir) char-list))
   char-list))
 
 (defun fold(keyboards cnt first-char)
@@ -27,23 +38,36 @@
 	(last-char))
     (dolist (dir1 (get-directions))
       (setf first-list (get-char-line keyboards half-cnt first-char dir1))
-      (if (>= (list-length first-list) half-cnt)
-	(progn
-	  (setf last-char (nth 0 (last first-list)))
-	  (dolist (second-first-char (get-chars-around keyboards last-char))
-             (dolist (dir2 (get-directions))
-	       (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
-	       (if (>= (list-length second-list) half-cnt)
-		 (format t "~D ~D~%" first-list second-list)))))))))
+      (when (>= (list-length first-list) half-cnt)
+	(setf last-char (nth 0 (last first-list)))
+	(dolist (second-first-char (get-chars-around keyboards last-char))
+          (dolist (dir2 (get-directions))
+	    (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
+	    (if (>= (list-length second-list) half-cnt)
+	      (format t "~D ~D~%" first-list second-list))))))))
 
-(defun pattern(keyboard cnt first-char)
-  "X characters. Then a direction from the first, Then X more characters going the same direction, and so on"
-  )
+(defun twist-list(keyboards cnt first-char)
+  "Foreach chunksize foreach direction 1 foreach direction2; get chunk of chars at direction and set the new starting point to ,whatever"
+  (dolist (chunk-size (factor cnt 2)) ; Start at 2, because we dont want chunk size 1
+    (dolist (dir1 (get-directions))
+      (dolist (dir2 (get-directions))
+        (let ((temp-list (list))
+	      (flat-list (list))
+	      (temp-char first-char))
+	  (dotimes (chunks-count-num (/ cnt chunk-size))
+	    (push nil temp-list)) ; I have no idea why I cannot do this in the below dotimes...
+          (dotimes (chunks-count-num (/ cnt chunk-size))
+	    (setf (nth chunks-count-num temp-list) (get-char-line keyboards chunk-size temp-char dir1))
+	    (setf temp-char (get-char-by-dir keyboards (first (nth chunks-count-num temp-list)) dir2))
+	  )
+          (setf flat-list (apply #'append temp-list)) ; Flatten matrix
+	  (if (>= (list-length flat-list) cnt)
+             (format t "Here: ~D~%" flat-list)))))))
 
 (defun starting-point(keyboards cnt first-char)
   "Foreach possile direction. Does it have base-count keys?"
-  (fold keyboards cnt first-char)
-  ;(pattern keyboards cnt first-char)
+  ;(fold keyboards cnt first-char) ;
+  (twist-list keyboards cnt first-char) ; pattern
   )
 
 (defun get-char-line(keyboards cnt current dir &optional (char-list (list current) char-list-supplied-p))
@@ -70,12 +94,11 @@
     (dolist (keyrow keyboard-matrix)
       (dolist (key keyrow)
         (dolist (dir '(:n :ne :e :se :sw :w :nw)) ; foreach direction
-          (if (and (getf dir-delta dir) ; if we have an offset for that direction
+          (when (and (getf dir-delta dir) ; if we have an offset for that direction
 		   key) ; sticking NIL check here for now
-            (progn
-              (setf next-key (get-next-key keyboard-matrix row col (getf dir-delta dir)))
-              (if next-key
-                (setf (getf (gethash key keyboard) dir) next-key)))))
+            (setf next-key (get-next-key keyboard-matrix row col (getf dir-delta dir)))
+            (if next-key
+              (setf (getf (gethash key keyboard) dir) next-key))))
 	 (setq col (+ col 1)))
       (setf col 0)
       (setf row (+ row 1)))
@@ -93,7 +116,8 @@
 		     (NIL "Z" "X" "C" "V" "B" "N" "M" "<" ">" "?")))
 	(micro-matrix '((1 2 3 4) ; For testing
 			("q" "w" "e" "r")
-			("a" "s" "d" "f")))
+			("a" "s" "d" "f")
+			("z" "x" "c" "v")))
 	(main-dir-delta '(:ne (-1 1) :e (0 1) :se (1 0) :sw (1 -1) :w (0 -1) :nw (-1 0)))
 	(num-matrix '((NIL "/(1)" "*(1)" "-(1)")
 		      ("7(1)" "8(1)" "9(1)" "+(1)" ) ; TODO: big plus key...
@@ -102,10 +126,10 @@
 		      ("0(1)" "0(2)" ".(1)" ))) ; TODO: big zero key...
         (num-dir-delta '(:n (-1 0) :ne (-1 1) :e (0 1) :se (1 1) :s (1 0) :sw (1 -1) :w (0 -1) :nw (-1 -1)))
         (keyboards (make-hash-table :test 'equal)))
-     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
-     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
-     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
-     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
+     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
      keyboards))
 
 (start-walk-keyboard (make-keyboards) base-count)
