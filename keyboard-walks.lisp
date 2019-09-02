@@ -30,25 +30,9 @@
       (pushnew (get-char-by-dir keyboards central-char dir) char-list))
   char-list))
 
-(defun fold(keyboards cnt first-char)
-  "Half the chars to a point, then another half going possibly another direction"
-  (let ((half-cnt (/ cnt 2))
-	(first-list (list))
-	(second-list (list))
-	(last-char))
-    (dolist (dir1 (get-directions))
-      (setf first-list (get-char-line keyboards half-cnt first-char dir1))
-      (when (>= (list-length first-list) half-cnt)
-	(setf last-char (nth 0 (last first-list)))
-	(dolist (second-first-char (get-chars-around keyboards last-char))
-          (dolist (dir2 (get-directions))
-	    (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
-	    (if (>= (list-length second-list) half-cnt)
-	      (format t "~D ~D~%" first-list second-list))))))))
-
-(defun twist-list(keyboards cnt first-char)
+(defmacro twist-list(keyboards cnt first-char chunker new-start-end)
   "Foreach chunksize foreach direction 1 foreach direction2; get chunk of chars at direction and set the new starting point to ,whatever"
-  (dolist (chunk-size (factor cnt 2)) ; Start at 2, because we dont want chunk size 1
+  `(dolist (chunk-size ,chunker) ; Start at 2, because we dont want chunk size 1
     (dolist (dir1 (get-directions))
       (dolist (dir2 (get-directions))
         (let ((temp-list (list))
@@ -58,16 +42,21 @@
 	    (push nil temp-list)) ; I have no idea why I cannot do this in the below dotimes...
           (dotimes (chunks-count-num (/ cnt chunk-size))
 	    (setf (nth chunks-count-num temp-list) (get-char-line keyboards chunk-size temp-char dir1))
-	    (setf temp-char (get-char-by-dir keyboards (first (nth chunks-count-num temp-list)) dir2))
+	    (setf temp-char (get-char-by-dir keyboards (,new-start-end (nth chunks-count-num temp-list)) dir2))
+	    ;(format t "~D -> last(~D) dir(~D) -> ~D~%" temp-list (,new-start-end (nth chunks-count-num temp-list)) dir2 temp-char )
 	  )
           (setf flat-list (apply #'append temp-list)) ; Flatten matrix
 	  (if (>= (list-length flat-list) cnt)
              (format t "Here: ~D~%" flat-list)))))))
 
+(defun last-item(arr)
+  "Like last, but not a list. Just one item"
+  (nth 0 (last arr)))
+
 (defun starting-point(keyboards cnt first-char)
   "Foreach possile direction. Does it have base-count keys?"
-  ;(fold keyboards cnt first-char) ;
-  (twist-list keyboards cnt first-char) ; pattern
+  (twist-list keyboards cnt first-char (list (/ cnt 2)) last-item) ; fold list in half. TODO: This doesnt seem to be getting all of then
+  (twist-list keyboards cnt first-char (factor cnt 2) first) ; pattern
   )
 
 (defun get-char-line(keyboards cnt current dir &optional (char-list (list current) char-list-supplied-p))
@@ -126,10 +115,10 @@
 		      ("0(1)" "0(2)" ".(1)" ))) ; TODO: big zero key...
         (num-dir-delta '(:n (-1 0) :ne (-1 1) :e (0 1) :se (1 1) :s (1 0) :sw (1 -1) :w (0 -1) :nw (-1 -1)))
         (keyboards (make-hash-table :test 'equal)))
-     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
-     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
+     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
+     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
      ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
-     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
      keyboards))
 
 (start-walk-keyboard (make-keyboards) base-count)
