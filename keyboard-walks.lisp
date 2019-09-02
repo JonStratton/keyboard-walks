@@ -1,17 +1,50 @@
 #!/usr/bin/sbcl --script
 
-(defparameter base-count 4)
+(defparameter base-count 8)
 
 (defun start-walk-keyboard(keyboards cnt)
   "Foreach key(letter) in keyboards."
   (maphash #'(lambda (k v) (starting-point keyboards cnt k)) keyboards))
 
-(defun starting-point(keyboards cnt firstchar)
+(defun get-directions()
+  '(:n :ne :e :se :s :sw :w :nw))
+
+(defun get-chars-around(keyboards central-char)
+  "Get the characters around another character on the keyboard"
+  (let ((char-list (list))
+	(dir-pairs))
+    (dolist (dir (get-directions))
+      (setf dir-pairs (get-char-line keyboards 2 central-char dir))
+      (if (>= (list-length dir-pairs) 2)
+	(pushnew (nth 1 dir-pairs) char-list)))
+  char-list))
+
+(defun fold(keyboards cnt first-char)
+  "Half the chars to a point, then another half going possibly another direction"
+  (let ((half-cnt (/ cnt 2))
+	(first-list (list))
+	(second-list (list))
+	(last-char))
+    (dolist (dir1 (get-directions))
+      (setf first-list (get-char-line keyboards half-cnt first-char dir1))
+      (if (>= (list-length first-list) half-cnt)
+	(progn
+	  (setf last-char (nth 0 (last first-list)))
+	  (dolist (second-first-char (get-chars-around keyboards last-char))
+             (dolist (dir2 (get-directions))
+	       (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
+	       (if (>= (list-length second-list) half-cnt)
+		 (format t "~D ~D~%" first-list second-list)))))))))
+
+(defun pattern(keyboard cnt first-char)
+  "X characters. Then a direction from the first, Then X more characters going the same direction, and so on"
+  )
+
+(defun starting-point(keyboards cnt first-char)
   "Foreach possile direction. Does it have base-count keys?"
-  (dolist (dir '(:n :ne :e :se :s :sw :w :nw))
-    (let ((current-list (get-char-line keyboards cnt firstchar dir)))
-       (if (>= (list-length current-list) cnt)
-          (format t "~D: ~D~%" dir current-list)))))
+  (fold keyboards cnt first-char)
+  ;(pattern keyboards cnt first-char)
+  )
 
 (defun get-char-line(keyboards cnt current dir &optional (char-list (list current) char-list-supplied-p))
   "if there is a char to the dir under cnt, get it"
@@ -51,13 +84,16 @@
 (defun make-keyboards()
   "A hash of chars to keyboard directions to keys. TODO: figure out number pad and its double keys."
   (let ((lc-matrix '(("`" 1 2 3 4 5 6 7 8 9 0 "-" "=")
-                    (NIL "q" "w" "e" "r" "t" "y" "u" "i" "o" "p" "[" "]" "\\")
-                    (NIL "a" "s" "d" "f" "g" "h" "j" "k" "l" ";" "'")
-                    (NIL "z" "x" "c" "v" "b" "n" "m" "," "." "/")))
+                     (NIL "q" "w" "e" "r" "t" "y" "u" "i" "o" "p" "[" "]" "\\")
+                     (NIL "a" "s" "d" "f" "g" "h" "j" "k" "l" ";" "'")
+                     (NIL "z" "x" "c" "v" "b" "n" "m" "," "." "/")))
 	(uc-matrix '(("~" "!" "@" "#" "$" "%" "^" "&" "*" "(" ")" "_" "+")
 		     (NIL "Q" "W" "E" "R" "T" "Y" "U" "I" "O" "P" "{" "}" "|")
 		     (NIL "A" "S" "D" "F" "G" "H" "J" "K" "L" ":")
 		     (NIL "Z" "X" "C" "V" "B" "N" "M" "<" ">" "?")))
+	(micro-matrix '((1 2 3 4) ; For testing
+			("q" "w" "e" "r")
+			("a" "s" "d" "f")))
 	(main-dir-delta '(:ne (-1 1) :e (0 1) :se (1 0) :sw (1 -1) :w (0 -1) :nw (-1 0)))
 	(num-matrix '((NIL "/(1)" "*(1)" "-(1)")
 		      ("7(1)" "8(1)" "9(1)" "+(1)" ) ; TODO: big plus key...
@@ -69,6 +105,7 @@
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
      keyboards))
 
 (start-walk-keyboard (make-keyboards) base-count)
