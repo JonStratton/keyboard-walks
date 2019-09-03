@@ -30,6 +30,24 @@
       (pushnew (get-char-by-dir keyboards central-char dir) char-list))
   char-list))
 
+(defun fold-list(keyboards cnt first-char)
+  "Half the chars to a point, then another half going possibly another direction"
+  (let ((half-cnt (/ cnt 2))
+	(first-list (list))
+	(second-list (list))
+	(flat-list (list))
+	(last-char))
+    (dolist (dir1 (get-directions))
+      (setf first-list (get-char-line keyboards half-cnt first-char dir1))
+      (when (>= (list-length first-list) half-cnt)
+	(setf last-char (nth 0 (last first-list)))
+	(dolist (second-first-char (get-chars-around keyboards last-char))
+          (dolist (dir2 (get-directions))
+	    (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
+	    (setf flat-list (apply #'append (list first-list second-list)))
+	    (if (>= (list-length flat-list) cnt)
+	      (format t "Got Fold: ~D~%" flat-list))))))))
+
 (defmacro twist-list(keyboards cnt first-char chunker new-start-end)
   "Foreach chunksize foreach direction 1 foreach direction2; get chunk of chars at direction and set the new starting point to ,whatever"
   `(dolist (chunk-size ,chunker) ; Start at 2, because we dont want chunk size 1
@@ -43,11 +61,10 @@
           (dotimes (chunks-count-num (/ cnt chunk-size))
 	    (setf (nth chunks-count-num temp-list) (get-char-line keyboards chunk-size temp-char dir1))
 	    (setf temp-char (get-char-by-dir keyboards (,new-start-end (nth chunks-count-num temp-list)) dir2))
-	    ;(format t "~D -> last(~D) dir(~D) -> ~D~%" temp-list (,new-start-end (nth chunks-count-num temp-list)) dir2 temp-char )
 	  )
           (setf flat-list (apply #'append temp-list)) ; Flatten matrix
 	  (if (>= (list-length flat-list) cnt)
-             (format t "Here: ~D~%" flat-list)))))))
+             (format t "Got Pattern: ~D~%" flat-list)))))))
 
 (defun last-item(arr)
   "Like last, but not a list. Just one item"
@@ -55,7 +72,8 @@
 
 (defun starting-point(keyboards cnt first-char)
   "Foreach possile direction. Does it have base-count keys?"
-  (twist-list keyboards cnt first-char (list (/ cnt 2)) last-item) ; fold list in half. TODO: This doesnt seem to be getting all of then
+  ;(twist-list keyboards cnt first-char (list (/ cnt 2)) last-item) ; fold list in half. TODO: This doesnt seem to be getting all of then
+  (fold-list keyboards cnt first-char)
   (twist-list keyboards cnt first-char (factor cnt 2) first) ; pattern
   )
 
