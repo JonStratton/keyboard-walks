@@ -61,6 +61,7 @@
           (dotimes (chunks-count-num (/ cnt chunk-size))
 	    (setf (nth chunks-count-num temp-list) (get-char-line keyboards chunk-size temp-char dir1))
 	    (setf temp-char (get-char-by-dir keyboards (,new-start-end (nth chunks-count-num temp-list)) dir2))
+	    ;(format t "Temp(~D at ~D [~D/~D]): ~D~%" chunk-size chunks-count-num dir1 dir2 temp-list)
 	  )
           (setf flat-list (apply #'append temp-list)) ; Flatten matrix
 	  (if (>= (list-length flat-list) cnt)
@@ -74,7 +75,7 @@
   "Foreach possile direction. Does it have base-count keys?"
   ;(twist-list keyboards cnt first-char (list (/ cnt 2)) last-item) ; fold list in half. TODO: This doesnt seem to be getting all of then
   (fold-list keyboards cnt first-char)
-  (twist-list keyboards cnt first-char (factor cnt 2) first) ; pattern
+  (twist-list keyboards cnt first-char (rest (factor cnt 2)) first) ; pattern
   )
 
 (defun get-char-line(keyboards cnt current dir &optional (char-list (list current) char-list-supplied-p))
