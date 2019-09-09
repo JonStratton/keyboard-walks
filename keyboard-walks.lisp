@@ -5,16 +5,45 @@
 (defun get-directions()
   '(:n :ne :e :se :s :sw :w :nw))
 
-(defun start-walk-keyboard(keyboards cnt)
-  "Foreach key(letter) in keyboards."
-  (maphash #'(lambda (k v) (starting-point keyboards cnt k)) keyboards))
-
 (defun factor(n &optional (start 1) (factors (list n)))
   (if (= 0 (mod n start))
     (push start (cdr (last factors))))
   (if (< start (/ n 2))
     (setf factors (factor n (+ start 1) factors)))
   factors)
+
+(defun get-combos(cnt &optional (options 2))
+  "return a list of lists of all possible options"
+  (let ((combos-returned))
+    (dotimes (flip options)
+      (if (<= cnt 1)
+        (setq combos-returned (append combos-returned (list (list flip))))
+        (dolist (combos-recurned (get-combos (- cnt 1) options))
+          (setq combos-returned (append combos-returned (list (append (list flip) combos-recurned)))))))
+    combos-returned))
+
+(defun shift-list(in-list shift-hash)
+  "Take a list of chars and apply the shift-hash to them"
+  (let ((return-list))
+    (dolist (in-char in-list)
+      (setq return-list (append return-list (list (gethash in-char shift-hash)))))
+    return-list))
+
+(defun shift-list-mask(in-list mask shift-hash)
+  "Take a list, a mask lining up with the list containing 1 and 0, and a function. Do the function on the things with a 1."
+  (let ((in-list-copy (copy-list in-list)))
+    (dotimes (mask-index (list-length mask))
+      (if (= (nth mask-index mask) 1)
+        (setf (nth mask-index in-list-copy) (shift-list (nth mask-index in-list-copy) shift-hash))))
+    in-list-copy))
+
+(defun shift-combo(matrix shift-hash)
+  "returns a matrix where every combo of the second level has been run against the input function"
+  (let ((return-list))
+    (dolist (mask (get-combos (list-length matrix)))
+      (let ((new-matrix (shift-list-mask (copy-list matrix) mask shift-hash)))
+	(setq return-list (append return-list (list new-matrix)))))
+    return-list))
 
 (defun get-char-by-dir(keyboards central-char dir)
   "Takes a keyboard and a direction, and returns that char or nil"
@@ -24,13 +53,13 @@
 
 (defun get-chars-around(keyboards central-char)
   "Get the characters around another character on the keyboard"
-  (let ((char-list (list))
+  (let ((char-list)
 	(dir-pairs))
     (dolist (dir (get-directions))
-      (pushnew (get-char-by-dir keyboards central-char dir) char-list))
+      (push (get-char-by-dir keyboards central-char dir) char-list))
   char-list))
 
-(defun fold-list(keyboards cnt first-char)
+(defun fold-list(keyboards shift-hash cnt first-char)
   "Half the chars to a point, then another half going possibly another direction"
   (let ((half-cnt (/ cnt 2))
 	(first-list (list))
@@ -44,13 +73,14 @@
 	(dolist (second-first-char (get-chars-around keyboards last-char))
           (dolist (dir2 (get-directions))
 	    (setf second-list (get-char-line keyboards half-cnt second-first-char dir2))
-	    (setf flat-list (apply #'append (list first-list second-list)))
-	    (if (>= (list-length flat-list) cnt)
-	      (format t "Got Fold: ~D~%" flat-list))))))))
+            (dolist (temp-shift-list (shift-combo (list first-list second-list) shift-hash))
+	      (let ((flat-list (apply #'append temp-shift-list))) ; Flatten matrix to list
+	      (if (>= (list-length flat-list) cnt)
+	        (format t "Got Fold: ~D~%" flat-list))))))))))
 
-(defmacro twist-list(keyboards cnt first-char chunker new-start-end)
+(defmacro twist-list(keyboards shift-hash cnt first-char chunker new-start-end)
   "Foreach chunksize foreach direction 1 foreach direction2; get chunk of chars at direction and set the new starting point to ,whatever"
-  `(dolist (chunk-size ,chunker) ; Start at 2, because we dont want chunk size 1
+  `(dolist (chunk-size ,chunker)
     (dolist (dir1 (get-directions))
       (dolist (dir2 (get-directions))
         (let ((temp-list (list))
@@ -61,21 +91,25 @@
           (dotimes (chunks-count-num (/ cnt chunk-size))
 	    (setf (nth chunks-count-num temp-list) (get-char-line keyboards chunk-size temp-char dir1))
 	    (setf temp-char (get-char-by-dir keyboards (,new-start-end (nth chunks-count-num temp-list)) dir2))
-	    ;(format t "Temp(~D at ~D [~D/~D]): ~D~%" chunk-size chunks-count-num dir1 dir2 temp-list)
 	  )
-          (setf flat-list (apply #'append temp-list)) ; Flatten matrix
-	  (if (>= (list-length flat-list) cnt)
-             (format t "Got Pattern: ~D~%" flat-list)))))))
+          (dolist (temp-shift-list (shift-combo temp-list shift-hash))
+	    (let ((flat-list (apply #'append temp-shift-list))) ; Flatten matrix to list
+	    (if (>= (list-length flat-list) cnt)
+              (format t "Got Pattern: ~D~%" flat-list)))))))))
 
 (defun last-item(arr)
   "Like last, but not a list. Just one item"
   (nth 0 (last arr)))
 
-(defun starting-point(keyboards cnt first-char)
+(defun start-walk-keyboard(keyboards shift-hash cnt)
+    "Foreach key(letter) in keyboards."
+      (maphash #'(lambda (k v) (starting-point keyboards shift-hash cnt k)) keyboards))
+
+(defun starting-point(keyboards shift-hash cnt first-char)
   "Foreach possile direction. Does it have base-count keys?"
   ;(twist-list keyboards cnt first-char (list (/ cnt 2)) last-item) ; fold list in half. TODO: This doesnt seem to be getting all of then
-  (fold-list keyboards cnt first-char)
-  (twist-list keyboards cnt first-char (rest (factor cnt 2)) first) ; pattern
+  (fold-list keyboards shift-hash cnt first-char)
+  (twist-list keyboards shift-hash cnt first-char (rest (factor cnt 2)) first) ; pattern
   )
 
 (defun get-char-line(keyboards cnt current dir &optional (char-list (list current) char-list-supplied-p))
@@ -86,6 +120,7 @@
     (setf char-list (get-char-line keyboards (- cnt 1) (getf (gethash current keyboards) dir) dir char-list)))
   char-list)
 
+; Logic for building keyboards and shift hash
 (defun get-next-key(keyboard-matrix row col delta)
   "Get the next key in the matrix with the current row and col and the delta list(row col)"
   (let ((row-next-key (+ row (nth 0 delta)))
@@ -101,9 +136,9 @@
   (let ((row 0) (col 0) (next-key NIL) (keyboard (make-hash-table :test 'equal)))
     (dolist (keyrow keyboard-matrix)
       (dolist (key keyrow)
-        (dolist (dir '(:n :ne :e :se :sw :w :nw)) ; foreach direction
+        (dolist (dir (get-directions)) ; foreach direction
           (when (and (getf dir-delta dir) ; if we have an offset for that direction
-		   key) ; sticking NIL check here for now
+		   key) ; and we are not on a NIL key
             (setf next-key (get-next-key keyboard-matrix row col (getf dir-delta dir)))
             (if next-key
               (setf (getf (gethash key keyboard) dir) next-key))))
@@ -120,12 +155,8 @@
                      (NIL "z" "x" "c" "v" "b" "n" "m" "," "." "/")))
 	(uc-matrix '(("~" "!" "@" "#" "$" "%" "^" "&" "*" "(" ")" "_" "+")
 		     (NIL "Q" "W" "E" "R" "T" "Y" "U" "I" "O" "P" "{" "}" "|")
-		     (NIL "A" "S" "D" "F" "G" "H" "J" "K" "L" ":")
+		     (NIL "A" "S" "D" "F" "G" "H" "J" "K" "L" ":" "\"")
 		     (NIL "Z" "X" "C" "V" "B" "N" "M" "<" ">" "?")))
-	(micro-matrix '((1 2 3 4) ; For testing
-			("q" "w" "e" "r")
-			("a" "s" "d" "f")
-			("z" "x" "c" "v")))
 	(main-dir-delta '(:ne (-1 1) :e (0 1) :se (1 0) :sw (1 -1) :w (0 -1) :nw (-1 0)))
 	(num-matrix '((NIL "/(1)" "*(1)" "-(1)")
 		      ("7(1)" "8(1)" "9(1)" "+(1)" ) ; TODO: big plus key...
@@ -135,9 +166,23 @@
         (num-dir-delta '(:n (-1 0) :ne (-1 1) :e (0 1) :se (1 1) :s (1 0) :sw (1 -1) :w (0 -1) :nw (-1 -1)))
         (keyboards (make-hash-table :test 'equal)))
      (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard lc-matrix main-dir-delta))
-     (maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta))
+     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard uc-matrix main-dir-delta)) ; Shifting now does this
      ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard num-matrix num-dir-delta))
-     ;(maphash #'(lambda (k v) (setf (gethash k keyboards) v)) (make-keyboard micro-matrix main-dir-delta))
      keyboards))
 
-(start-walk-keyboard (make-keyboards) base-count)
+(defun make-shift()
+  (let ((lc '("`" 1 2 3 4 5 6 7 8 9 0 "-" "="
+              "q" "w" "e" "r" "t" "y" "u" "i" "o" "p" "[" "]" "\\"
+              "a" "s" "d" "f" "g" "h" "j" "k" "l" ";" "'"
+              "z" "x" "c" "v" "b" "n" "m" "," "." "/"))
+	(uc '("~" "!" "@" "#" "$" "%" "^" "&" "*" "(" ")" "_" "+"
+              "Q" "W" "E" "R" "T" "Y" "U" "I" "O" "P" "{" "}" "|"
+              "A" "S" "D" "F" "G" "H" "J" "K" "L" ":" "\""
+              "Z" "X" "C" "V" "B" "N" "M" "<" ">" "?"))
+	(shift (make-hash-table :test 'equal)))
+    (dotimes (cnt (list-length lc))
+      (setf (gethash (nth cnt lc) shift) (nth cnt uc))
+      (setf (gethash (nth cnt uc) shift) (nth cnt lc)))
+    shift))
+
+(start-walk-keyboard (make-keyboards) (make-shift) base-count)
