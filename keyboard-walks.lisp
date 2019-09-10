@@ -185,4 +185,16 @@
       (setf (gethash (nth cnt uc) shift) (nth cnt lc)))
     shift))
 
+; http://cl-cookbook.sourceforge.net/os.html
+(defun my-command-line()
+  (or
+    #+SBCL *posix-argv*
+    #+LISPWORKS system:*line-arguments-list*
+    #+CMU extensions:*command-line-words*
+    nil))
+
+(let ((argv (my-command-line)))
+  (if (>= (list-length argv) 2)
+    (defparameter base-count (parse-integer (last-item (my-command-line))))))
+
 (start-walk-keyboard (make-keyboards) (make-shift) base-count)
