@@ -26,7 +26,8 @@
   "Take a list of chars and apply the shift-hash to them"
   (let ((return-list))
     (dolist (in-char in-list)
-      (setq return-list (append return-list (list (gethash in-char shift-hash)))))
+      (if (gethash in-char shift-hash)
+        (setq return-list (append return-list (list (gethash in-char shift-hash))))))
     return-list))
 
 (defun shift-list-mask(in-list mask shift-hash)
