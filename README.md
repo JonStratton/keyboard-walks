@@ -1,4 +1,6 @@
 # keyboard-walks
+This project has moved. To get the latest version, pull from https://codeberg.org/JonStratton/keyboard-walks
+
 Generate lists of keyboard-walks. 
 
 ## About
